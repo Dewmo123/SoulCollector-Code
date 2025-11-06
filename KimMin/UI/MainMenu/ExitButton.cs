@@ -1,0 +1,1 @@
+using UnityEngine; class ExitButton : MonoBehaviour { void Awake() => GetComponent<UnityEngine.UI.Button>().onClick.AddListener(Application.Quit); }
