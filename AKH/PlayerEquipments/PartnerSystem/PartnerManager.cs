@@ -69,24 +69,42 @@ namespace Scripts.PlayerEquipments.PartnerSystem
         private async void HandleLevelupPartner(LevelUpPartnerEvent @event)
         {
             EquipableItemSO item = @event.targetItem;
-            PartnerDTO dto = _storage.PartnerStorage.Partners[item.itemName];
-            int currentLevel = dto.Level;
-            if(currentLevel >= item.GetMaxLevel(dto.Upgrade))
+            if (item == null ||
+                !_partners.TryGetValue(item.itemName, out Partner partner) ||
+                !_storage.PartnerStorage.Partners.TryGetValue(item.itemName, out PartnerDTO dto))
             {
                 @event.callback?.Invoke(item, false);
                 return;
             }
-            EnchantInfo enchant = item.enchantInfo.enchantInfos[currentLevel];
-            bool success = await _storage.GoodsStorage.ChangeGoods(enchant.needType.goodsType, enchant.needAmount);
-            if (success)
-            {
-                await _storage.PartnerStorage.LevelUpPartner(item.itemName, 1);
-                @event.callback?.Invoke(item, true);
-            }
-            else
+
+            int currentLevel = dto.Level;
+            if(currentLevel >= item.GetMaxLevel(dto.Upgrade) ||
+                !TryGetEnchantInfo(item, currentLevel, out EnchantInfo enchant) ||
+                enchant.needType == null ||
+                enchant.needAmount < 0)
             {
                 @event.callback?.Invoke(item, false);
+                return;
             }
+
+            int cost = enchant.needAmount;
+            bool goodsChanged = await _storage.GoodsStorage.ChangeGoods(enchant.needType.goodsType, -cost);
+            if (!goodsChanged)
+            {
+                @event.callback?.Invoke(item, false);
+                return;
+            }
+
+            bool partnerLeveled = await _storage.PartnerStorage.LevelUpPartner(item.itemName, 1);
+            if (!partnerLeveled)
+            {
+                await _storage.GoodsStorage.ChangeGoods(enchant.needType.goodsType, cost);
+                @event.callback?.Invoke(item, false);
+                return;
+            }
+
+            partner.LevelUp();
+            @event.callback?.Invoke(item, true);
         }
         private async void HandleAddPartnerAmountEvent(AddPartnerAmountEvent @event)
         {
@@ -130,6 +148,25 @@ namespace Scripts.PlayerEquipments.PartnerSystem
             bool success = await _storage.PartnerStorage.EquipPartner(idx, partnerName);
             if (success)
                 Sockets[idx].ChangeItem(partnerName == null ? null : _partners[partnerName]);
+        }
+
+        private bool TryGetEnchantInfo(EquipableItemSO item, int level, out EnchantInfo enchantInfo)
+        {
+            enchantInfo = default;
+            if (item.enchantInfo == null || item.enchantInfo.enchantInfos == null)
+            {
+                Debug.LogWarning($"PartnerManager: Missing enchant data. Item: {item.itemName}");
+                return false;
+            }
+
+            if (level < 0 || level >= item.enchantInfo.enchantInfos.Count)
+            {
+                Debug.LogWarning($"PartnerManager: Enchant level is out of range. Item: {item.itemName}, Level: {level}");
+                return false;
+            }
+
+            enchantInfo = item.enchantInfo.enchantInfos[level];
+            return true;
         }
     }
 }

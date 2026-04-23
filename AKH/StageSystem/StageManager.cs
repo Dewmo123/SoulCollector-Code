@@ -1,18 +1,13 @@
-﻿using AYellowpaper.SerializedCollections;
-using DewmoLib.Dependencies;
+﻿using DewmoLib.Dependencies;
 using DewmoLib.ObjectPool.RunTime;
 using Scripts.Enemies;
 using Scripts.Entities;
 using Scripts.Players;
 using Scripts.Players.Storages;
-using Scripts.UI;
-using System;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
 using Work.Common.Core;
 using Work.Core;
-using Work.Dungeon;
 
 namespace Scripts.StageSystem
 {
@@ -65,10 +60,10 @@ namespace Scripts.StageSystem
             _stateMachine.CurrentState?.OnPlayerDead(entity);
         }
 
-        public Entity SpawnEnemy(EnemySO enemySO,Vector3 position,UnityAction<Entity> deadCallback, bool isBoss = false)
+        public Entity SpawnEnemy(EnemySO enemySO, Vector3 position, UnityAction<Entity> deadCallback, bool isBoss = false)
         {
             if (isBoss) GameEventBus.RaiseEvent(_bossPopup.Initializer(enemySO));
-            
+
             var enemy = _poolManager.Pop<Enemy>(enemyItem);
             enemy.SetUpEnemy(enemySO, _player, position);
             enemy.OnDeadEvent.AddListener(deadCallback);

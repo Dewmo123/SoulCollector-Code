@@ -44,10 +44,36 @@ namespace Scripts.Players
             UpgradeDataSO upgradeData = @event.upgradeData;
             int level = _storage.StatStorage.Stats[upgradeData.statType];
             if (upgradeData.maxLevel <= level)
+            {
+                @event.callback?.Invoke(false);
                 return;
-            bool success = await _storage.GoodsStorage.ChangeGoods(GoodsType.Gold, -upgradeData.GetNextUpgradeCost(level));
-            @event.callback?.Invoke(success);
-            if (success&& await _storage.StatStorage.ChangeStat(upgradeData.statType, 1))
+            }
+
+            int cost = upgradeData.GetNextUpgradeCost(level);
+            if (cost < 0)
+            {
+                Debug.LogWarning($"PlayerUpgradeManager: Invalid upgrade cost. Stat: {upgradeData.statType}, Cost: {cost}");
+                @event.callback?.Invoke(false);
+                return;
+            }
+
+            bool goodsChanged = await _storage.GoodsStorage.ChangeGoods(GoodsType.Gold, -cost);
+            if (!goodsChanged)
+            {
+                @event.callback?.Invoke(false);
+                return;
+            }
+
+            bool statChanged = await _storage.StatStorage.ChangeStat(upgradeData.statType, 1);
+            if (!statChanged)
+            {
+                await _storage.GoodsStorage.ChangeGoods(GoodsType.Gold, cost);
+                @event.callback?.Invoke(false);
+                return;
+            }
+
+            @event.callback?.Invoke(true);
+            if (statChanged)
             {
                 _entityStat.RemoveModifier(upgradeData.upgradeStat, "level");
                 _entityStat.AddModifier(upgradeData.upgradeStat, "level",

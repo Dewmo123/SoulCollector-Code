@@ -76,20 +76,42 @@ namespace Scripts.PlayerEquipments.SkillSystem
         private async void HandleLevelupSkill(LevelUpSkillEvent @event)
         {
             EquipableItemSO item = @event.targetItem;
-            Skill target = _skills[item.itemName];
-            int currentLevel = _storage.SkillStorage.Skills[item.itemName].Level;
-            EnchantInfo enchant = item.enchantInfo.enchantInfos[currentLevel];
-            bool success = await _storage.GoodsStorage.ChangeGoods(enchant.needType.goodsType, -enchant.needAmount);
-            if (success)
-            {
-                await _storage.SkillStorage.LevelUpSkill(item.itemName, 1);
-                target.LevelUp();
-                @event.callback?.Invoke(item, true);
-            }
-            else
+            if (item == null ||
+                !_skills.TryGetValue(item.itemName, out Skill target) ||
+                !_storage.SkillStorage.Skills.TryGetValue(item.itemName, out SkillDTO dto))
             {
                 @event.callback?.Invoke(item, false);
+                return;
             }
+
+            int currentLevel = dto.Level;
+            if (currentLevel >= item.GetMaxLevel(dto.Upgrade) ||
+                !TryGetEnchantInfo(item, currentLevel, out EnchantInfo enchant) ||
+                enchant.needType == null ||
+                enchant.needAmount < 0)
+            {
+                @event.callback?.Invoke(item, false);
+                return;
+            }
+
+            int cost = enchant.needAmount;
+            bool goodsChanged = await _storage.GoodsStorage.ChangeGoods(enchant.needType.goodsType, -cost);
+            if (!goodsChanged)
+            {
+                @event.callback?.Invoke(item, false);
+                return;
+            }
+
+            bool skillLeveled = await _storage.SkillStorage.LevelUpSkill(item.itemName, 1);
+            if (!skillLeveled)
+            {
+                await _storage.GoodsStorage.ChangeGoods(enchant.needType.goodsType, cost);
+                @event.callback?.Invoke(item, false);
+                return;
+            }
+
+            target.LevelUp();
+            @event.callback?.Invoke(item, true);
         }
         private async void HandleAddSkillAmountEvent(AddSkillAmountEvent @event)
         {
@@ -166,5 +188,24 @@ namespace Scripts.PlayerEquipments.SkillSystem
             }
         }
         public void SetCooldown(int idx) => SkillSockets[idx].SetCooldown();
+
+        private bool TryGetEnchantInfo(EquipableItemSO item, int level, out EnchantInfo enchantInfo)
+        {
+            enchantInfo = default;
+            if (item.enchantInfo == null || item.enchantInfo.enchantInfos == null)
+            {
+                Debug.LogWarning($"PlayerSkillManager: Missing enchant data. Item: {item.itemName}");
+                return false;
+            }
+
+            if (level < 0 || level >= item.enchantInfo.enchantInfos.Count)
+            {
+                Debug.LogWarning($"PlayerSkillManager: Enchant level is out of range. Item: {item.itemName}, Level: {level}");
+                return false;
+            }
+
+            enchantInfo = item.enchantInfo.enchantInfos[level];
+            return true;
+        }
     }
 }

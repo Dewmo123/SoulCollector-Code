@@ -22,7 +22,7 @@ namespace Scripts.UI.Main
         }
         private void Update()
         {
-            text.SetText(NumberFormatter.Format(_storage.GoodsStorage.Goods[goodsSO.goodsType]));
+            text.SetText(NumberFormatter.Format(_storage.GoodsStorage.GetGoodsAmount(goodsSO.goodsType)));
         }
     }
 }

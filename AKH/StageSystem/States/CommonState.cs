@@ -81,7 +81,14 @@ namespace Scripts.StageSystem.States
             foreach (var item in _stageSO.dropInfos)
             {
                 if (Random.value < item.percent)
-                    await _storage.GoodsStorage.ChangeGoods(item.type, item.GetValue(_stage));
+                {
+                    int amount = item.GetValue(_stage);
+                    bool success = await _storage.GoodsStorage.ChangeGoods(item.type, amount);
+                    if (!success)
+                    {
+                        Debug.LogWarning($"CommonState: Failed to add dropped goods. Type: {item.type}, Amount: {amount}");
+                    }
+                }
             }
             await _storage.ChapterStorage.EnemyDead(1);
             SetProgressUI();

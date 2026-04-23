@@ -90,7 +90,11 @@ namespace Scripts.StageSystem.States
                 }
                 else if( item.Key is GoodsSO goods)
                 {
-                    await _storage.GoodsStorage.ChangeGoods(goods.goodsType, item.Value);
+                    bool success = await _storage.GoodsStorage.ChangeGoods(goods.goodsType, item.Value);
+                    if (!success)
+                    {
+                        Debug.LogWarning($"DungeonState: Failed to add reward goods. Type: {goods.goodsType}, Amount: {item.Value}");
+                    }
                 }
             }
             _stageManager.ChangeState(StageStateEnum.Common, _chapter.ToString());
